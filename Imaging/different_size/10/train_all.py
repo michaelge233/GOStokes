@@ -7,20 +7,23 @@ import pandas as pd
 from scipy.ndimage import zoom
 from math import pi
 import os
-import sys
-import time
 
 print("Using torch", torch.__version__)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
 
-save_dir = "./pixels_20/"
+save_dir = "./pixels/"
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
 norm_factor=65536
-
-y_anchor=[i for i in range(100,1000,20)]
-x_anchor=[i for i in range(200,1100,20)]
+seed = 1212
+np.random.seed(seed)
+y_anchor= np.arange(100,1000,10)
+x_anchor=np.arange(200,1100,10)
+idx = np.arange(x_anchor.shape[0]*y_anchor.shape[0])
+np.random.shuffle(idx)
+y_anchor = y_anchor[idx[:100]//x_anchor.shape[0]]
+x_anchor = x_anchor[idx[:100]%x_anchor.shape[0]]
 
 class Simple_CNN(nn.Module):
     def __init__(self,p):
@@ -28,16 +31,15 @@ class Simple_CNN(nn.Module):
         self.conv1 = nn.Sequential(         
             nn.Conv2d(1,16,5,1,2),                              
             nn.ReLU(),            
-            nn.MaxPool2d(kernel_size=2),    
         )
         self.conv2 = nn.Sequential(         
             nn.Conv2d(16,32,3,1,1),     
-            nn.ReLU(),         
+            nn.ReLU(),
         )
         self.conv3 = nn.Sequential(         
             nn.Conv2d(32,32,3,1,1),     
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
+            nn.MaxPool2d(kernel_size=2),                
         )
         self.mlp = nn.Sequential(
             nn.Dropout(p=p),
@@ -104,7 +106,7 @@ def evaluate(model,X,y,loss_fn,batchsize=5001,calc_MAE=False):
 
 
 def run_cnn_exp(task_name,x_train,x_val,x_test,y_train,y_val,y_test,
-                p=0.001,seed_list=[324,716,10086],n_epoch=2000,save_dir=save_dir):
+                p=0.001,seed_list=[324,716,10086],n_epoch=4000,save_dir=save_dir):
     score=[]
     print("Running %s"%task_name)
     for seed in seed_list:
@@ -140,13 +142,13 @@ def run_cnn_exp(task_name,x_train,x_val,x_test,y_train,y_val,y_test,
         
         best_idx=np.argmin(result[:,1])
         score.append(result[best_idx,2])
-        result=pd.DataFrame(result,columns=["train_loss","validation_loss","test_loss",
-                                            "S0_loss","S1_loss","S2_loss","S3_loss",
-                                            "S0_MAE","S1_MAE","S2_MAE","S3_MAE"])
+        result=pd.DataFrame(result,columns=["train_loss","validation_loss","test_loss","S0_loss","S1_loss","S2_loss","S3_loss",
+                                           "S0_MAE","S1_MAE","S2_MAE","S3_MAE"])
         save_filename=save_dir+task_name+"_seed%d"%seed+".csv"
         result.to_csv(save_filename,index=False)
         #print("\n")
     return score
+    
 
 def stokes_from_alphabeta(alpha,beta):
     alpha=alpha/180*pi
@@ -157,28 +159,28 @@ def stokes_from_alphabeta(alpha,beta):
     result[2]=-np.sin(4*alpha-2*beta)
     return result
 
-def get_dataset(i_y,i_x,pixel_size=20,seed=1212):
+def get_dataset(i_y,i_x,pixel_size=10,seed=1212):
     np.random.seed(seed)
     ori_y=np.zeros((1200,3),dtype=np.float32)
-    fo=np.load("./dataset/alphabeta.npz")
+    fo=np.load("../dataset/alphabeta.npz")
     cur_alpha=fo["arr_0"]
     cur_beta=fo["arr_1"]
     for i in range(1200):
         ori_y[i]=stokes_from_alphabeta(cur_alpha[i],cur_beta[i])
-    ori_x=np.zeros((1200,20,20),dtype=np.float32)
+    ori_x=np.zeros((1200,10,10),dtype=np.float32)
     for i in range(12):
-        temp=np.load("./dataset/data%d.npz"%i)["arr_0"][:,
+        temp=np.load("../dataset/data%d.npz"%i)["arr_0"][:,
                                                         y_anchor[i_y]:y_anchor[i_y]+pixel_size,
                                                         x_anchor[i_x]:x_anchor[i_x]+pixel_size]
         for j in range(100):
-            ori_x[i*100+j]=zoom(temp[j],(20/temp[j].shape[0],20/temp[j].shape[1]))
+            ori_x[i*100+j]=zoom(temp[j],(10/temp[j].shape[0],10/temp[j].shape[1]))
 
     shuffled_i=np.arange(1200)
     np.random.shuffle(shuffled_i)
     ori_y=ori_y[shuffled_i]
     ori_x=ori_x[shuffled_i]
 
-    x_train=np.zeros((1000*10,1,20,20),dtype=np.float32)
+    x_train=np.zeros((1000*10,1,10,10),dtype=np.float32)
     y_train=np.ones((1000*10,4),dtype=np.float32)
     y_train[:1000,1:]=ori_y[:1000]
     x_train[:1000,0]=ori_x[:1000]
@@ -188,7 +190,7 @@ def get_dataset(i_y,i_x,pixel_size=20,seed=1212):
             x_train[i*1000+j,0]=ori_x[j]*temp[j]
         y_train[i*1000:(i+1)*1000,0]=temp
         y_train[i*1000:(i+1)*1000,1:]=ori_y[:1000]
-    x_val=np.zeros((100*10,1,20,20),dtype=np.float32)
+    x_val=np.zeros((100*10,1,10,10),dtype=np.float32)
     y_val=np.ones((100*10,4),dtype=np.float32)
     y_val[:100,1:]=ori_y[1000:1100]
     x_val[:100,0]=ori_x[1000:1100]
@@ -198,7 +200,7 @@ def get_dataset(i_y,i_x,pixel_size=20,seed=1212):
             x_val[i*100+j,0]=ori_x[1000+j]*temp[j]
         y_val[i*100:(i+1)*100,0]=temp
         y_val[i*100:(i+1)*100,1:]=ori_y[1000:1100]
-    x_test=np.zeros((100*10,1,20,20),dtype=np.float32)
+    x_test=np.zeros((100*10,1,10,10),dtype=np.float32)
     y_test=np.ones((100*10,4),dtype=np.float32)
     y_test[:100,1:]=ori_y[1100:]
     x_test[:100,0]=ori_x[1100:]
@@ -211,12 +213,10 @@ def get_dataset(i_y,i_x,pixel_size=20,seed=1212):
         
     np.random.seed(seed)
     aug_rand=np.random.rand(120)*1.5+1
-    dark_img=np.load("./img/dark.npz")["arr_0"][y_anchor[i_y]:y_anchor[i_y]+pixel_size,
-                                                x_anchor[i_x]:x_anchor[i_x]+pixel_size]
-    x_aug=np.zeros((120,1,20,20),dtype=np.float32)
+    dark_img=np.load("../img/dark.npz")["arr_0"][y_anchor[i_y]:y_anchor[i_y]+pixel_size,x_anchor[i_x]:x_anchor[i_x]+pixel_size]
+    x_aug=np.zeros((120,1,10,10),dtype=np.float32)
     for i in range(120):
-        x_aug[i,0]=(zoom(dark_img,
-                         (20/pixel_size,20/pixel_size))*aug_rand[i]).astype(np.float32)
+        x_aug[i,0]=(zoom(dark_img,(10/pixel_size,10/pixel_size))*aug_rand[i]).astype(np.float32)
     x_train=np.concatenate((x_train,x_aug[:100]))
     x_val=np.concatenate((x_val,x_aug[100:110]))
     x_test=np.concatenate((x_test,x_aug[110:]))
@@ -233,18 +233,11 @@ def get_dataset(i_y,i_x,pixel_size=20,seed=1212):
     
     return x_train,x_val,x_test,y_train,y_val,y_test
 
-def train_pixel(i_y,i_x,pixel_size=20,seed=1212):
+def train_pixel(i_y,i_x,pixel_size=10,seed=1212):
     x_train,x_val,x_test,y_train,y_val,y_test=get_dataset(i_y,i_x,pixel_size,seed=seed)
     run_cnn_exp("y%d_x%d"%(i_y,i_x),x_train,x_val,x_test,y_train,y_val,y_test,
                 seed_list=[seed])
-
-print("Start at:",time.ctime())
-for i in range(len(y_anchor)):
-    for j in range(len(x_anchor)):
-        start_time = time.time()
-        train_pixel(i,j)
-        end_time = time.time()
-        print("Time used: %d"%(end_time-start_time))
-        sys.stdout.flush()
-print("End at:",time.ctime())
+    
+for i in range(y_anchor.shape[0]):
+    train_pixel(i,i,pixel_size=10)
 print("All finished...")
