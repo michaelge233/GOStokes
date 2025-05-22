@@ -1,7 +1,7 @@
 # GOStokes
 Code for unpublished paper *Accurate Single-Shot Full-Stokes Detection Enabled by Heterogeneous Grain Orientations in Polycrystalline Films*.
 
-This repository contains the code for dataset collection and model training to perform full-Stokes detection using the GOStokes approach proposed by Mingwei Ge, Menaxia Liu et al. The dataset and trained models are available at [Zenodo](https://zenodo.org/records/15175282?token=eyJhbGciOiJIUzUxMiJ9.eyJpZCI6IjE2ZGJmMDdjLTE1NzAtNDEyMC1iMjg1LWY0ZTFmMWVjZmRiNSIsImRhdGEiOnt9LCJyYW5kb20iOiI4ZDliMGYzNjg4MDc5ZWQyYjMyMDZlY2FkYWNmM2E0MiJ9.1vZilKguiAyfgvU8j8gFxqNIpCcboX9g82uTokeZ4DsCaeo-kkvegkcZEJTkW4AEZKMxyGpC7uS4dfQovo6uNA). 
+This repository contains the code for dataset collection and model training to perform full-Stokes detection using the GOStokes approach proposed by Mingwei Ge, Menaxia Liu et al. The dataset and trained models are available at [Zenodo](https://zenodo.org/records/15492456). 
 
 ## System Requirements 
 
